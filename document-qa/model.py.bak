@@ -1,0 +1,74 @@
+import streamlit as st
+from transformers import LayoutL    # Get answer
+    input_ids = encoding.input_ids[0].numpy()
+    offset_mapping = encoding.offset_mapping[0].numpy()
+    
+    # Get the answer span
+    answer_start = offset_mapping[start_idx][0]
+    answer_end = offset_mapping[end_idx][1]
+    
+    # Get the answer tokens and decode them
+    answer_tokens = input_ids[start_idx:end_idx + 1]
+    answer = processor.tokenizer.decode(answer_tokens, skip_special_tokens=True)
+    
+    return answer.strip()cessor, LayoutLMv3ForQuestionAnswering
+import torch
+import numpy as np
+
+@st.cache_resource
+def load_model():
+    """
+    Load the LayoutLMv3 model and processor.
+    """
+    # Load processor and model from Hugging Face with OCR disabled
+    processor = LayoutLMv3Processor.from_pretrained(
+        "microsoft/layoutlmv3-base",
+        apply_ocr=False  # Disable OCR as we're handling it separately
+    )
+    model = LayoutLMv3ForQuestionAnswering.from_pretrained("microsoft/layoutlmv3-base")
+    
+    return {
+        'processor': processor,
+        'model': model
+    }
+
+def get_answer(model_dict, doc_data, question):
+    """
+    Get answer for the question using the model.
+    """
+    processor = model_dict['processor']
+    model = model_dict['model']
+    
+    # Prepare inputs with question and context
+    encoding = processor(
+        images=doc_data['image'],
+        text=[question],  # Question goes first
+        text_pair=doc_data['words'],  # Document words as second text
+        boxes=[[0, 0, 0, 0]] + doc_data['boxes'],  # Dummy box for question + document boxes
+        return_tensors="pt",
+        truncation=True,
+        padding="max_length",
+        max_length=512,
+        stride=128,
+        return_overflowing_tokens=True,
+        return_offsets_mapping=True
+    )
+    
+    # Forward pass
+    with torch.no_grad():
+        outputs = model(**encoding)
+    
+    # Get answer
+    start_logits = outputs.start_logits[0].numpy()
+    end_logits = outputs.end_logits[0].numpy()
+    
+    # Get most likely answer span
+    start_idx = np.argmax(start_logits)
+    end_idx = np.argmax(end_logits)
+    
+    # Get answer text
+    input_ids = encoding.input_ids[0].numpy()
+    answer_tokens = input_ids[start_idx:end_idx + 1]
+    answer = processor.tokenizer.decode(answer_tokens)
+    
+    return answer
