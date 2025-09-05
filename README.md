@@ -1,4 +1,4 @@
-# Document Query Engine
+# Intelligent-Multilingual-Document-Understanding
 
 An interactive web application that allows users to upload documents and ask questions about their content using state-of-the-art AI technology.
 
